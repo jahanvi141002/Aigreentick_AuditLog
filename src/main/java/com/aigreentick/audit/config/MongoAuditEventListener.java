@@ -1,18 +1,18 @@
 package com.aigreentick.audit.config;
 
 import com.aigreentick.audit.model.AuditLog;
-import com.aigreentick.audit.repository.AuditLogRepository;
+import com.aigreentick.audit.service.AuditLogKafkaProducer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.mongodb.core.mapping.event.AbstractMongoEventListener;
-import org.springframework.data.mongodb.core.mapping.event.AfterConvertEvent;
 import org.springframework.data.mongodb.core.mapping.event.AfterDeleteEvent;
 import org.springframework.data.mongodb.core.mapping.event.AfterSaveEvent;
 import org.springframework.data.mongodb.core.mapping.event.BeforeConvertEvent;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.stereotype.Component;
+import jakarta.annotation.PostConstruct;
 
 import java.time.LocalDateTime;
 
@@ -25,25 +25,26 @@ public class MongoAuditEventListener extends AbstractMongoEventListener<Object> 
 
     private static final Logger logger = LoggerFactory.getLogger(MongoAuditEventListener.class);
     
-    private final AuditLogRepository auditLogRepository;
+    @PostConstruct
+    public void init() {
+        logger.info("=== MongoAuditEventListener initialized and registered ===");
+        logger.info("=== Will listen for MongoDB operations on all collections except audit_logs ===");
+    }
+    
+    private final AuditLogKafkaProducer auditLogKafkaProducer;
     private final ObjectMapper objectMapper;
     private MongoTemplate mongoTemplate;
     
-    // Collections to exclude from auditing (e.g., audit_logs itself)
     private static final String AUDIT_LOGS_COLLECTION = "audit_logs";
-    
-    // Thread-local storage for old values (to capture before UPDATE)
     private static final ThreadLocal<org.bson.Document> oldValueStorage = new ThreadLocal<>();
+    private static final ThreadLocal<Boolean> isNewEntityFlag = new ThreadLocal<>();
 
     @Autowired
-    public MongoAuditEventListener(AuditLogRepository auditLogRepository) {
-        this.auditLogRepository = auditLogRepository;
+    public MongoAuditEventListener(AuditLogKafkaProducer auditLogKafkaProducer, MongoTemplate mongoTemplate) {
+        this.auditLogKafkaProducer = auditLogKafkaProducer;
         this.objectMapper = new ObjectMapper();
-    }
-    
-    @Autowired(required = false)
-    public void setMongoTemplate(MongoTemplate mongoTemplate) {
         this.mongoTemplate = mongoTemplate;
+        logger.info("=== MongoAuditEventListener constructor called with MongoTemplate ===");
     }
     
     /**
@@ -59,8 +60,12 @@ public class MongoAuditEventListener extends AbstractMongoEventListener<Object> 
             Object entity = event.getSource();
             String entityId = extractEntityId(entity);
             
-            // If entity has an ID, it's an UPDATE - fetch old value
-            if (entityId != null && mongoTemplate != null) {
+            // Check if entity is new (ID is null before MongoDB generates it)
+            boolean isNew = (entityId == null || entityId.isEmpty());
+            isNewEntityFlag.set(isNew);
+            
+            // If it's an update, fetch the old document
+            if (!isNew && mongoTemplate != null) {
                 try {
                     org.bson.Document oldDocument = mongoTemplate.findById(entityId, org.bson.Document.class, event.getCollectionName());
                     if (oldDocument != null) {
@@ -81,28 +86,36 @@ public class MongoAuditEventListener extends AbstractMongoEventListener<Object> 
     @Override
     public void onAfterSave(AfterSaveEvent<Object> event) {
         try {
-            // Skip auditing audit logs themselves to avoid recursion
+            logger.info("=== onAfterSave CALLED for collection: {} ===", event.getCollectionName());
+            
             if (AUDIT_LOGS_COLLECTION.equals(event.getCollectionName())) {
+                logger.debug("Skipping audit log for audit_logs collection itself");
                 return;
             }
+
+            logger.info("onAfterSave triggered for collection: {}", event.getCollectionName());
 
             Object entity = event.getSource();
             String entityId = extractEntityId(entity);
             String entityName = extractEntityName(entity);
             
-            // Get user context from thread-local
             String username = MongoAuditContext.getUsername();
             String ipAddress = MongoAuditContext.getIpAddress();
             
-            // If no username set, use "system"
             if (username == null || username.isEmpty()) {
                 username = "system";
             }
 
-            // Determine action: CREATE if ID was just generated, UPDATE otherwise
-            String action = isNewEntity(entity) ? "CREATE" : "UPDATE";
-
-            // Convert entity to JSON
+            // Use the flag set in onBeforeConvert
+            Boolean isNew = isNewEntityFlag.get();
+            if (isNew == null) {
+                // Fallback to checking entity ID (shouldn't happen)
+                isNew = isNewEntity(entity);
+            }
+            String action = isNew ? "CREATE" : "UPDATE";
+            
+            // Clear the flag
+            isNewEntityFlag.remove();
             String newValueJson = null;
             try {
                 newValueJson = objectMapper.writeValueAsString(entity);
@@ -111,7 +124,6 @@ public class MongoAuditEventListener extends AbstractMongoEventListener<Object> 
                 newValueJson = entity.toString();
             }
 
-            // Get old value for UPDATE operations
             String oldValueJson = null;
             if ("UPDATE".equals(action)) {
                 org.bson.Document oldDocument = oldValueStorage.get();
@@ -121,11 +133,10 @@ public class MongoAuditEventListener extends AbstractMongoEventListener<Object> 
                     } catch (Exception e) {
                         oldValueJson = oldDocument.toJson();
                     }
-                    oldValueStorage.remove(); // Clean up
+                    oldValueStorage.remove();
                 }
             }
 
-            // Create audit log
             AuditLog auditLog = new AuditLog();
             auditLog.setUsername(username);
             auditLog.setEntityName(entityName);
@@ -137,14 +148,15 @@ public class MongoAuditEventListener extends AbstractMongoEventListener<Object> 
             auditLog.setTimestamp(LocalDateTime.now());
             auditLog.setDescription(String.format("Database %s operation on %s", action, entityName));
 
-            // Save audit log (this will NOT trigger another audit event because we check collection name)
-            auditLogRepository.save(auditLog);
+            logger.info("Sending audit log to Kafka: action={}, entity={}, entityId={}, username={}", 
+                action, entityName, entityId, username);
+            
+            auditLogKafkaProducer.sendAuditLog(auditLog);
 
-            logger.debug("Audit log created for {} operation on {}", action, entityName);
+            logger.info("Audit log sent to Kafka for {} operation on {}", action, entityName);
 
         } catch (Exception e) {
             logger.error("Error creating audit log for save operation", e);
-            // Don't throw exception to avoid breaking the main operation
         }
     }
 
@@ -154,7 +166,6 @@ public class MongoAuditEventListener extends AbstractMongoEventListener<Object> 
     @Override
     public void onAfterDelete(AfterDeleteEvent<Object> event) {
         try {
-            // Skip auditing audit logs themselves
             if (AUDIT_LOGS_COLLECTION.equals(event.getCollectionName())) {
                 return;
             }
@@ -162,7 +173,6 @@ public class MongoAuditEventListener extends AbstractMongoEventListener<Object> 
             String entityId = extractIdFromDocument(event.getDocument());
             String entityName = extractEntityNameFromCollection(event.getCollectionName());
 
-            // Get user context
             String username = MongoAuditContext.getUsername();
             String ipAddress = MongoAuditContext.getIpAddress();
 
@@ -170,7 +180,6 @@ public class MongoAuditEventListener extends AbstractMongoEventListener<Object> 
                 username = "system";
             }
 
-            // Get the deleted document as JSON
             String oldValueJson = null;
             try {
                 oldValueJson = objectMapper.writeValueAsString(event.getDocument());
@@ -190,9 +199,9 @@ public class MongoAuditEventListener extends AbstractMongoEventListener<Object> 
             auditLog.setTimestamp(LocalDateTime.now());
             auditLog.setDescription(String.format("Database DELETE operation on %s", entityName));
 
-            auditLogRepository.save(auditLog);
+            auditLogKafkaProducer.sendAuditLog(auditLog);
 
-            logger.debug("Audit log created for DELETE operation on {}", entityName);
+            logger.debug("Audit log sent to Kafka for DELETE operation on {}", entityName);
 
         } catch (Exception e) {
             logger.error("Error creating audit log for delete operation", e);

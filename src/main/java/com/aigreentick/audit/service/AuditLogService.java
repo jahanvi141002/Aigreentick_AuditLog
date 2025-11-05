@@ -20,86 +20,12 @@ public class AuditLogService {
     }
 
     /**
-     * Create a new audit log entry
+     * Create a new audit log entry (for manual logging if needed)
      */
     public AuditLog createAuditLog(AuditLog auditLog) {
         if (auditLog.getTimestamp() == null) {
             auditLog.setTimestamp(LocalDateTime.now());
         }
-        return auditLogRepository.save(auditLog);
-    }
-
-    /**
-     * Create audit log with common parameters
-     */
-    public AuditLog log(String username, String entityName, String action) {
-        AuditLog auditLog = new AuditLog(username, entityName, action);
-        return auditLogRepository.save(auditLog);
-    }
-
-    /**
-     * Create audit log with entity ID
-     */
-    public AuditLog log(String username, String entityName, String entityId, String action) {
-        AuditLog auditLog = new AuditLog(username, entityName, action);
-        auditLog.setEntityId(entityId);
-        return auditLogRepository.save(auditLog);
-    }
-
-    /**
-     * Create audit log with entity ID and IP address
-     */
-    public AuditLog log(String username, String entityName, String entityId, String action, String ipAddress) {
-        AuditLog auditLog = new AuditLog(username, entityName, action);
-        auditLog.setEntityId(entityId);
-        auditLog.setIpAddress(ipAddress);
-        return auditLogRepository.save(auditLog);
-    }
-
-    /**
-     * Create audit log with action and IP address (without entity ID)
-     * Note: Method name differs to avoid signature conflict
-     */
-    public AuditLog logWithIp(String username, String entityName, String action, String ipAddress) {
-        AuditLog auditLog = new AuditLog(username, entityName, action);
-        auditLog.setIpAddress(ipAddress);
-        return auditLogRepository.save(auditLog);
-    }
-
-    /**
-     * Create audit log with old and new values (for UPDATE operations)
-     */
-    public AuditLog logUpdate(String username, String entityName, String entityId, 
-                              String oldValue, String newValue, String ipAddress) {
-        AuditLog auditLog = new AuditLog(username, entityName, "UPDATE");
-        auditLog.setEntityId(entityId);
-        auditLog.setOldValue(oldValue);
-        auditLog.setNewValue(newValue);
-        auditLog.setIpAddress(ipAddress);
-        return auditLogRepository.save(auditLog);
-    }
-
-    /**
-     * Create audit log for CREATE operation
-     */
-    public AuditLog logCreate(String username, String entityName, String entityId, 
-                             String newValue, String ipAddress) {
-        AuditLog auditLog = new AuditLog(username, entityName, "CREATE");
-        auditLog.setEntityId(entityId);
-        auditLog.setNewValue(newValue);
-        auditLog.setIpAddress(ipAddress);
-        return auditLogRepository.save(auditLog);
-    }
-
-    /**
-     * Create audit log for DELETE operation
-     */
-    public AuditLog logDelete(String username, String entityName, String entityId, 
-                             String oldValue, String ipAddress) {
-        AuditLog auditLog = new AuditLog(username, entityName, "DELETE");
-        auditLog.setEntityId(entityId);
-        auditLog.setOldValue(oldValue);
-        auditLog.setIpAddress(ipAddress);
         return auditLogRepository.save(auditLog);
     }
 
