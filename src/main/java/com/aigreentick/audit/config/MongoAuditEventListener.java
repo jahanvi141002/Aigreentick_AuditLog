@@ -12,6 +12,7 @@ import org.springframework.data.mongodb.core.mapping.event.AfterSaveEvent;
 import org.springframework.data.mongodb.core.mapping.event.BeforeConvertEvent;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.annotation.Value;
 import jakarta.annotation.PostConstruct;
 
 import java.time.LocalDateTime;
@@ -25,17 +26,16 @@ public class MongoAuditEventListener extends AbstractMongoEventListener<Object> 
 
     private static final Logger logger = LoggerFactory.getLogger(MongoAuditEventListener.class);
     
-    @PostConstruct
-    public void init() {
-        logger.info("=== MongoAuditEventListener initialized and registered ===");
-        logger.info("=== Will listen for MongoDB operations on all collections except audit_logs ===");
-    }
+    @Value("${audit.collection.name:audit_logs}")
+    private String auditLogsCollection;
+    
+    @Value("${audit.default.username:system}")
+    private String defaultUsername;
     
     private final AuditLogKafkaProducer auditLogKafkaProducer;
     private final ObjectMapper objectMapper;
     private MongoTemplate mongoTemplate;
     
-    private static final String AUDIT_LOGS_COLLECTION = "audit_logs";
     private static final ThreadLocal<org.bson.Document> oldValueStorage = new ThreadLocal<>();
     private static final ThreadLocal<Boolean> isNewEntityFlag = new ThreadLocal<>();
 
@@ -47,13 +47,20 @@ public class MongoAuditEventListener extends AbstractMongoEventListener<Object> 
         logger.info("=== MongoAuditEventListener constructor called with MongoTemplate ===");
     }
     
+    @PostConstruct
+    public void init() {
+        logger.info("=== MongoAuditEventListener initialized and registered ===");
+        logger.info("=== Will listen for MongoDB operations on all collections except {} ===", auditLogsCollection);
+        logger.info("=== Default username: {} ===", defaultUsername);
+    }
+    
     /**
      * Before convert - Capture old value for UPDATE operations
      */
     @Override
     public void onBeforeConvert(BeforeConvertEvent<Object> event) {
         try {
-            if (AUDIT_LOGS_COLLECTION.equals(event.getCollectionName())) {
+            if (auditLogsCollection.equals(event.getCollectionName())) {
                 return;
             }
 
@@ -88,8 +95,8 @@ public class MongoAuditEventListener extends AbstractMongoEventListener<Object> 
         try {
             logger.info("=== onAfterSave CALLED for collection: {} ===", event.getCollectionName());
             
-            if (AUDIT_LOGS_COLLECTION.equals(event.getCollectionName())) {
-                logger.debug("Skipping audit log for audit_logs collection itself");
+            if (auditLogsCollection.equals(event.getCollectionName())) {
+                logger.debug("Skipping audit log for {} collection itself", auditLogsCollection);
                 return;
             }
 
@@ -103,7 +110,7 @@ public class MongoAuditEventListener extends AbstractMongoEventListener<Object> 
             String ipAddress = MongoAuditContext.getIpAddress();
             
             if (username == null || username.isEmpty()) {
-                username = "system";
+                username = defaultUsername;
             }
 
             // Use the flag set in onBeforeConvert
@@ -166,7 +173,7 @@ public class MongoAuditEventListener extends AbstractMongoEventListener<Object> 
     @Override
     public void onAfterDelete(AfterDeleteEvent<Object> event) {
         try {
-            if (AUDIT_LOGS_COLLECTION.equals(event.getCollectionName())) {
+            if (auditLogsCollection.equals(event.getCollectionName())) {
                 return;
             }
 

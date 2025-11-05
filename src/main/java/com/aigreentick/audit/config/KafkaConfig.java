@@ -60,6 +60,33 @@ public class KafkaConfig {
     @Value("${spring.kafka.listener.concurrency:3}")
     private Integer concurrency;
 
+    @Value("${spring.kafka.consumer.session-timeout-ms:45000}")
+    private Integer sessionTimeoutMs;
+
+    @Value("${spring.kafka.consumer.heartbeat-interval-ms:3000}")
+    private Integer heartbeatIntervalMs;
+
+    @Value("${spring.kafka.consumer.max-poll-interval-ms:300000}")
+    private Integer maxPollIntervalMs;
+
+    @Value("${spring.kafka.consumer.request-timeout-ms:60000}")
+    private Integer requestTimeoutMs;
+
+    @Value("${spring.kafka.consumer.default-api-timeout-ms:60000}")
+    private Integer defaultApiTimeoutMs;
+
+    @Value("${spring.kafka.consumer.metadata-max-age-ms:30000}")
+    private Integer metadataMaxAgeMs;
+
+    @Value("${spring.kafka.consumer.reconnect-backoff-ms:100}")
+    private Integer reconnectBackoffMs;
+
+    @Value("${spring.kafka.consumer.reconnect-backoff-max-ms:1000}")
+    private Integer reconnectBackoffMaxMs;
+
+    @Value("${spring.kafka.consumer.client-id-prefix:audit-consumer}")
+    private String clientIdPrefix;
+
     @Bean
     public ProducerFactory<String, AuditLog> producerFactory() {
         Map<String, Object> configProps = new HashMap<>();
@@ -94,16 +121,16 @@ public class KafkaConfig {
         props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
         
         // Add session timeout and heartbeat to help with group joining
-        props.put(ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG, 45000);
-        props.put(ConsumerConfig.HEARTBEAT_INTERVAL_MS_CONFIG, 3000);
-        props.put(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, 300000);
+        props.put(ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG, sessionTimeoutMs);
+        props.put(ConsumerConfig.HEARTBEAT_INTERVAL_MS_CONFIG, heartbeatIntervalMs);
+        props.put(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, maxPollIntervalMs);
         
         // CRITICAL: Increase timeouts to handle coordinator timeout issues
-        props.put(ConsumerConfig.REQUEST_TIMEOUT_MS_CONFIG, 60000); // Increase request timeout
-        props.put(ConsumerConfig.DEFAULT_API_TIMEOUT_MS_CONFIG, 60000); // Increase default API timeout
+        props.put(ConsumerConfig.REQUEST_TIMEOUT_MS_CONFIG, requestTimeoutMs);
+        props.put(ConsumerConfig.DEFAULT_API_TIMEOUT_MS_CONFIG, defaultApiTimeoutMs);
         
         // Reduce initial rebalance delay for faster partition assignment
-        props.put(ConsumerConfig.METADATA_MAX_AGE_CONFIG, 30000); // Refresh metadata every 30 seconds
+        props.put(ConsumerConfig.METADATA_MAX_AGE_CONFIG, metadataMaxAgeMs);
         
         // Note: GROUP_INITIAL_REBALANCE_DELAY_MS is a broker config, not consumer config
         // But we can reduce consumer-side delays
@@ -112,11 +139,11 @@ public class KafkaConfig {
         props.put(ConsumerConfig.ALLOW_AUTO_CREATE_TOPICS_CONFIG, true);
         
         // Force consumer to start consuming immediately
-        props.put(ConsumerConfig.CLIENT_ID_CONFIG, "audit-consumer-" + System.currentTimeMillis());
+        props.put(ConsumerConfig.CLIENT_ID_CONFIG, clientIdPrefix + "-" + System.currentTimeMillis());
         
         // CRITICAL: Increase reconnection delays to handle coordinator connection issues
-        props.put(ConsumerConfig.RECONNECT_BACKOFF_MS_CONFIG, 100);
-        props.put(ConsumerConfig.RECONNECT_BACKOFF_MAX_MS_CONFIG, 1000);
+        props.put(ConsumerConfig.RECONNECT_BACKOFF_MS_CONFIG, reconnectBackoffMs);
+        props.put(ConsumerConfig.RECONNECT_BACKOFF_MAX_MS_CONFIG, reconnectBackoffMaxMs);
         
         props.put(JsonDeserializer.TRUSTED_PACKAGES, "*");
         props.put(JsonDeserializer.VALUE_DEFAULT_TYPE, AuditLog.class.getName());

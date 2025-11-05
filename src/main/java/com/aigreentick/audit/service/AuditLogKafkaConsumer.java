@@ -5,6 +5,7 @@ import com.aigreentick.audit.repository.AuditLogRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.kafka.support.KafkaHeaders;
@@ -23,7 +24,9 @@ import java.util.concurrent.locks.ReentrantLock;
 public class AuditLogKafkaConsumer {
 
     private static final Logger logger = LoggerFactory.getLogger(AuditLogKafkaConsumer.class);
-    private static final int BATCH_SIZE = 10;
+    
+    @Value("${audit.consumer.batch-size:10}")
+    private int batchSize;
 
     @Autowired
     private AuditLogRepository auditLogRepository;
@@ -34,10 +37,10 @@ public class AuditLogKafkaConsumer {
     
     @PostConstruct
     public void init() {
-        logger.error("=== AuditLogKafkaConsumer initialized with BATCH SAVING (10 records) ===");
-        logger.error("=== Ready to consume messages from topic: audit-logs ===");
-        logger.error("=== Will save exactly 10 records in each batch ===");
-        logger.error("=== Buffer size: {} records ===", BATCH_SIZE);
+        logger.info("=== AuditLogKafkaConsumer initialized with BATCH SAVING ({} records) ===", batchSize);
+        logger.info("=== Ready to consume messages from topic: audit-logs ===");
+        logger.info("=== Will save exactly {} records in each batch ===", batchSize);
+        logger.info("=== Buffer size: {} records ===", batchSize);
     }
     
     @PreDestroy
@@ -83,25 +86,25 @@ public class AuditLogKafkaConsumer {
                 logger.info("Added {} records to buffer. Total in buffer: {}", 
                     auditLogs.size(), buffer.size());
 
-                // Process batches of exactly 10 records
-                while (buffer.size() >= BATCH_SIZE) {
-                    // Extract exactly 10 records from buffer
-                    List<AuditLog> batchToSave = new ArrayList<>(buffer.subList(0, BATCH_SIZE));
-                    // Remove first 10 records from buffer
-                    buffer.subList(0, BATCH_SIZE).clear();
+                // Process batches of exactly batchSize records
+                while (buffer.size() >= batchSize) {
+                    // Extract exactly batchSize records from buffer
+                    List<AuditLog> batchToSave = new ArrayList<>(buffer.subList(0, batchSize));
+                    // Remove first batchSize records from buffer
+                    buffer.subList(0, batchSize).clear();
                     
-                    logger.info("=== SAVING BATCH OF EXACTLY {} RECORDS ===", BATCH_SIZE);
+                    logger.info("=== SAVING BATCH OF EXACTLY {} RECORDS ===", batchSize);
                     logger.info("Buffer now has {} records remaining", buffer.size());
                     
-                    // Save exactly 10 records to database
+                    // Save exactly batchSize records to database
                     auditLogRepository.saveAll(batchToSave);
-                    logger.info("✅ Successfully saved exactly {} audit logs to database", BATCH_SIZE);
+                    logger.info("✅ Successfully saved exactly {} audit logs to database", batchSize);
                 }
                 
-                // Log if buffer has records but less than 10
-                if (buffer.size() > 0 && buffer.size() < BATCH_SIZE) {
+                // Log if buffer has records but less than batchSize
+                if (buffer.size() > 0 && buffer.size() < batchSize) {
                     logger.info("Buffer has {} records (waiting for {} more to reach batch size of {})", 
-                        buffer.size(), BATCH_SIZE - buffer.size(), BATCH_SIZE);
+                        buffer.size(), batchSize - buffer.size(), batchSize);
                 }
                 
             } finally {
