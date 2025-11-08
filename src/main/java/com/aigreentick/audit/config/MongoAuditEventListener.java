@@ -107,6 +107,9 @@ public class MongoAuditEventListener extends AbstractMongoEventListener<Object> 
             String entityName = extractEntityName(entity);
             
             String username = MongoAuditContext.getUsername();
+            String userId = MongoAuditContext.getUserId();
+            String organizationId = MongoAuditContext.getOrganizationId();
+            String urlDomain = MongoAuditContext.getUrlDomain();
             String ipAddress = MongoAuditContext.getIpAddress();
             
             if (username == null || username.isEmpty()) {
@@ -146,6 +149,9 @@ public class MongoAuditEventListener extends AbstractMongoEventListener<Object> 
 
             AuditLog auditLog = new AuditLog();
             auditLog.setUsername(username);
+            auditLog.setUserId(userId);
+            auditLog.setOrganizationId(organizationId);
+            auditLog.setUrlDomain(urlDomain);
             auditLog.setEntityName(entityName);
             auditLog.setEntityId(entityId);
             auditLog.setAction(action);
@@ -181,6 +187,9 @@ public class MongoAuditEventListener extends AbstractMongoEventListener<Object> 
             String entityName = extractEntityNameFromCollection(event.getCollectionName());
 
             String username = MongoAuditContext.getUsername();
+            String userId = MongoAuditContext.getUserId();
+            String organizationId = MongoAuditContext.getOrganizationId();
+            String urlDomain = MongoAuditContext.getUrlDomain();
             String ipAddress = MongoAuditContext.getIpAddress();
 
             if (username == null || username.isEmpty()) {
@@ -198,6 +207,9 @@ public class MongoAuditEventListener extends AbstractMongoEventListener<Object> 
             // Create audit log
             AuditLog auditLog = new AuditLog();
             auditLog.setUsername(username);
+            auditLog.setUserId(userId);
+            auditLog.setOrganizationId(organizationId);
+            auditLog.setUrlDomain(urlDomain);
             auditLog.setEntityName(entityName);
             auditLog.setEntityId(entityId);
             auditLog.setAction("DELETE");

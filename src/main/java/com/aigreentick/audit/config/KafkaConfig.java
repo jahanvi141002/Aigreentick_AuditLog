@@ -1,6 +1,7 @@
 package com.aigreentick.audit.config;
 
 import com.aigreentick.audit.model.AuditLog;
+import com.aigreentick.audit.model.ExceptionLog;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
@@ -198,6 +199,120 @@ public class KafkaConfig {
                     }
                 } else {
                     logger.error("=== REBALANCE: FAILED! No partitions assigned! This is a problem! ===");
+                }
+            }
+        });
+        
+        return factory;
+    }
+
+    // ExceptionLog Producer Configuration
+    @Bean
+    public ProducerFactory<String, ExceptionLog> exceptionLogProducerFactory() {
+        Map<String, Object> configProps = new HashMap<>();
+        configProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        configProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+        configProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JsonSerializer.class);
+        configProps.put(ProducerConfig.ACKS_CONFIG, acks);
+        configProps.put(ProducerConfig.RETRIES_CONFIG, retries);
+        configProps.put(ProducerConfig.BATCH_SIZE_CONFIG, batchSize);
+        configProps.put(ProducerConfig.LINGER_MS_CONFIG, lingerMs);
+        configProps.put(ProducerConfig.BUFFER_MEMORY_CONFIG, bufferMemory);
+        
+        return new DefaultKafkaProducerFactory<>(configProps);
+    }
+
+    @Bean
+    public KafkaTemplate<String, ExceptionLog> exceptionLogKafkaTemplate() {
+        return new KafkaTemplate<>(exceptionLogProducerFactory());
+    }
+
+    // ExceptionLog Consumer Configuration
+    @Bean
+    public ConsumerFactory<String, ExceptionLog> exceptionLogConsumerFactory() {
+        Map<String, Object> props = new HashMap<>();
+        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        props.put(ConsumerConfig.GROUP_ID_CONFIG, groupId);
+        props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+        props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, JsonDeserializer.class);
+        props.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, maxPollRecords);
+        props.put(ConsumerConfig.FETCH_MIN_BYTES_CONFIG, fetchMinBytes);
+        props.put(ConsumerConfig.FETCH_MAX_WAIT_MS_CONFIG, fetchMaxWaitMs);
+        props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, autoOffsetReset);
+        props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
+        
+        // Add session timeout and heartbeat to help with group joining
+        props.put(ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG, sessionTimeoutMs);
+        props.put(ConsumerConfig.HEARTBEAT_INTERVAL_MS_CONFIG, heartbeatIntervalMs);
+        props.put(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, maxPollIntervalMs);
+        
+        // CRITICAL: Increase timeouts to handle coordinator timeout issues
+        props.put(ConsumerConfig.REQUEST_TIMEOUT_MS_CONFIG, requestTimeoutMs);
+        props.put(ConsumerConfig.DEFAULT_API_TIMEOUT_MS_CONFIG, defaultApiTimeoutMs);
+        
+        // Reduce initial rebalance delay for faster partition assignment
+        props.put(ConsumerConfig.METADATA_MAX_AGE_CONFIG, metadataMaxAgeMs);
+        
+        // Allow auto topic creation (if needed)
+        props.put(ConsumerConfig.ALLOW_AUTO_CREATE_TOPICS_CONFIG, true);
+        
+        // Force consumer to start consuming immediately
+        props.put(ConsumerConfig.CLIENT_ID_CONFIG, clientIdPrefix + "-exception-" + System.currentTimeMillis());
+        
+        // CRITICAL: Increase reconnection delays to handle coordinator connection issues
+        props.put(ConsumerConfig.RECONNECT_BACKOFF_MS_CONFIG, reconnectBackoffMs);
+        props.put(ConsumerConfig.RECONNECT_BACKOFF_MAX_MS_CONFIG, reconnectBackoffMaxMs);
+        
+        props.put(JsonDeserializer.TRUSTED_PACKAGES, "*");
+        props.put(JsonDeserializer.VALUE_DEFAULT_TYPE, ExceptionLog.class.getName());
+        
+        return new DefaultKafkaConsumerFactory<>(props);
+    }
+
+    @Bean
+    public ConcurrentKafkaListenerContainerFactory<String, ExceptionLog> exceptionLogKafkaListenerContainerFactory() {
+        ConcurrentKafkaListenerContainerFactory<String, ExceptionLog> factory = 
+            new ConcurrentKafkaListenerContainerFactory<>();
+        factory.setConsumerFactory(exceptionLogConsumerFactory());
+        factory.setBatchListener(true);
+        factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL_IMMEDIATE);
+        factory.setConcurrency(concurrency);
+        
+        // Set sync commits to ensure offset commits happen synchronously
+        factory.getContainerProperties().setSyncCommits(true);
+        
+        // Log container lifecycle events
+        factory.getContainerProperties().setLogContainerConfig(true);
+        
+        // Force immediate start - don't wait for group rebalance delay
+        factory.setAutoStartup(true);
+        
+        // Add error handler to log deserialization errors
+        CommonErrorHandler errorHandler = new CommonLoggingErrorHandler();
+        factory.setCommonErrorHandler(errorHandler);
+        
+        // Add listener to track partition assignment
+        factory.getContainerProperties().setConsumerRebalanceListener(new ConsumerRebalanceListener() {
+            private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(KafkaConfig.class);
+            
+            @Override
+            public void onPartitionsRevoked(java.util.Collection<TopicPartition> partitions) {
+                logger.info("=== EXCEPTION LOG REBALANCE: Partitions revoked: {} ===", partitions);
+                if (partitions == null || partitions.isEmpty()) {
+                    logger.warn("=== EXCEPTION LOG REBALANCE: No partitions to revoke (this is normal during startup) ===");
+                }
+            }
+            
+            @Override
+            public void onPartitionsAssigned(java.util.Collection<TopicPartition> partitions) {
+                logger.info("=== EXCEPTION LOG REBALANCE: Partitions assigned: {} ===", partitions);
+                if (partitions != null && !partitions.isEmpty()) {
+                    logger.info("=== EXCEPTION LOG REBALANCE: SUCCESS! Assigned {} partition(s) ===", partitions.size());
+                    for (TopicPartition partition : partitions) {
+                        logger.info("=== EXCEPTION LOG REBALANCE: Partition {} assigned to consumer ===", partition);
+                    }
+                } else {
+                    logger.error("=== EXCEPTION LOG REBALANCE: FAILED! No partitions assigned! This is a problem! ===");
                 }
             }
         });

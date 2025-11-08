@@ -13,6 +13,15 @@ public interface AuditLogRepository extends MongoRepository<AuditLog, String> {
     // Find by username
     List<AuditLog> findByUsername(String username);
 
+    // Find by user ID
+    List<AuditLog> findByUserId(String userId);
+
+    // Find by organization ID
+    List<AuditLog> findByOrganizationId(String organizationId);
+
+    // Find by URL domain
+    List<AuditLog> findByUrlDomain(String urlDomain);
+
     // Find by entity name
     List<AuditLog> findByEntityName(String entityName);
 
@@ -30,5 +39,14 @@ public interface AuditLogRepository extends MongoRepository<AuditLog, String> {
 
     // Find by entity name and timestamp range
     List<AuditLog> findByEntityNameAndTimestampBetween(String entityName, LocalDateTime start, LocalDateTime end);
+
+    // Find by user ID and timestamp range
+    List<AuditLog> findByUserIdAndTimestampBetween(String userId, LocalDateTime start, LocalDateTime end);
+
+    // Find by organization ID and timestamp range
+    List<AuditLog> findByOrganizationIdAndTimestampBetween(String organizationId, LocalDateTime start, LocalDateTime end);
+
+    // Find by URL domain and timestamp range
+    List<AuditLog> findByUrlDomainAndTimestampBetween(String urlDomain, LocalDateTime start, LocalDateTime end);
 }
 

@@ -51,6 +51,27 @@ public class AuditLogService {
     }
 
     /**
+     * Get audit logs by user ID
+     */
+    public List<AuditLog> getAuditLogsByUserId(String userId) {
+        return auditLogRepository.findByUserId(userId);
+    }
+
+    /**
+     * Get audit logs by organization ID
+     */
+    public List<AuditLog> getAuditLogsByOrganizationId(String organizationId) {
+        return auditLogRepository.findByOrganizationId(organizationId);
+    }
+
+    /**
+     * Get audit logs by URL domain
+     */
+    public List<AuditLog> getAuditLogsByUrlDomain(String urlDomain) {
+        return auditLogRepository.findByUrlDomain(urlDomain);
+    }
+
+    /**
      * Get audit logs by entity name
      */
     public List<AuditLog> getAuditLogsByEntityName(String entityName) {
@@ -94,6 +115,33 @@ public class AuditLogService {
                                                                LocalDateTime start, 
                                                                LocalDateTime end) {
         return auditLogRepository.findByEntityNameAndTimestampBetween(entityName, start, end);
+    }
+
+    /**
+     * Get audit logs by user ID and date range
+     */
+    public List<AuditLog> getAuditLogsByUserIdAndDateRange(String userId, 
+                                                           LocalDateTime start, 
+                                                           LocalDateTime end) {
+        return auditLogRepository.findByUserIdAndTimestampBetween(userId, start, end);
+    }
+
+    /**
+     * Get audit logs by organization ID and date range
+     */
+    public List<AuditLog> getAuditLogsByOrganizationIdAndDateRange(String organizationId, 
+                                                                  LocalDateTime start, 
+                                                                  LocalDateTime end) {
+        return auditLogRepository.findByOrganizationIdAndTimestampBetween(organizationId, start, end);
+    }
+
+    /**
+     * Get audit logs by URL domain and date range
+     */
+    public List<AuditLog> getAuditLogsByUrlDomainAndDateRange(String urlDomain, 
+                                                              LocalDateTime start, 
+                                                              LocalDateTime end) {
+        return auditLogRepository.findByUrlDomainAndTimestampBetween(urlDomain, start, end);
     }
 }
 

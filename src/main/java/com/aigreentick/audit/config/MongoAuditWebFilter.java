@@ -11,7 +11,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 
 /**
- * Web filter to capture user context (username and IP) from HTTP requests
+ * Web filter to capture user context (username, userId, organizationId, urlDomain, IP) from HTTP requests
  * This allows database-level auditing to know who performed the operation
  */
 @Component
@@ -30,11 +30,23 @@ public class MongoAuditWebFilter extends OncePerRequestFilter {
                 username = "anonymous";
             }
 
+            // Extract user ID from header
+            String userId = request.getHeader("X-User-Id");
+
+            // Extract organization ID from header
+            String organizationId = request.getHeader("X-Organization-Id");
+
+            // Extract URL domain from request
+            String urlDomain = extractUrlDomain(request);
+
             // Extract IP address
             String ipAddress = getClientIpAddress(request);
 
             // Set context for database-level auditing
             MongoAuditContext.setUsername(username);
+            MongoAuditContext.setUserId(userId);
+            MongoAuditContext.setOrganizationId(organizationId);
+            MongoAuditContext.setUrlDomain(urlDomain);
             MongoAuditContext.setIpAddress(ipAddress);
 
             // Continue with the request
@@ -43,6 +55,20 @@ public class MongoAuditWebFilter extends OncePerRequestFilter {
         } finally {
             // Clear context after request to avoid memory leaks
             MongoAuditContext.clear();
+        }
+    }
+
+    /**
+     * Extract URL domain from request
+     */
+    private String extractUrlDomain(HttpServletRequest request) {
+        String requestUrl = request.getRequestURL().toString();
+        try {
+            java.net.URL url = new java.net.URL(requestUrl);
+            return url.getHost();
+        } catch (Exception e) {
+            // Fallback to server name if URL parsing fails
+            return request.getServerName();
         }
     }
 

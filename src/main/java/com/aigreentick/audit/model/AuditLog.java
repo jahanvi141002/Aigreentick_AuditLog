@@ -11,10 +11,19 @@ public class AuditLog {
 
     @Id
     private String id;
-
+    
     // Who did the action
     @Field(name = "username")
     private String username;
+    
+    @Field(name = "user_id")
+    private String userId;
+    
+    @Field(name = "organization_id")
+    private String organizationId;
+    
+    @Field(name = "url_domain")
+    private String urlDomain;
 
     // Which module or entity type (e.g., "User", "Invoice")
     @Field(name = "entity_name")
@@ -141,11 +150,38 @@ public class AuditLog {
         this.ipAddress = ipAddress;
     }
 
+    public String getUserId() {
+        return userId;
+    }
+
+    public void setUserId(String userId) {
+        this.userId = userId;
+    }
+
+    public String getOrganizationId() {
+        return organizationId;
+    }
+
+    public void setOrganizationId(String organizationId) {
+        this.organizationId = organizationId;
+    }
+
+    public String getUrlDomain() {
+        return urlDomain;
+    }
+
+    public void setUrlDomain(String urlDomain) {
+        this.urlDomain = urlDomain;
+    }
+
     @Override
     public String toString() {
         return "AuditLog{" +
                 "id='" + id + '\'' +
                 ", username='" + username + '\'' +
+                ", userId='" + userId + '\'' +
+                ", organizationId='" + organizationId + '\'' +
+                ", urlDomain='" + urlDomain + '\'' +
                 ", entityName='" + entityName + '\'' +
                 ", entityId='" + entityId + '\'' +
                 ", action='" + action + '\'' +

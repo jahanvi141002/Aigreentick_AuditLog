@@ -69,6 +69,33 @@ public class AuditLogController {
     }
 
     /**
+     * Get audit logs by user ID
+     */
+    @GetMapping("/user-id/{userId}")
+    public ResponseEntity<List<AuditLog>> getAuditLogsByUserId(@PathVariable String userId) {
+        List<AuditLog> auditLogs = auditLogService.getAuditLogsByUserId(userId);
+        return ResponseEntity.ok(auditLogs);
+    }
+
+    /**
+     * Get audit logs by organization ID
+     */
+    @GetMapping("/organization-id/{organizationId}")
+    public ResponseEntity<List<AuditLog>> getAuditLogsByOrganizationId(@PathVariable String organizationId) {
+        List<AuditLog> auditLogs = auditLogService.getAuditLogsByOrganizationId(organizationId);
+        return ResponseEntity.ok(auditLogs);
+    }
+
+    /**
+     * Get audit logs by URL domain
+     */
+    @GetMapping("/url-domain/{urlDomain}")
+    public ResponseEntity<List<AuditLog>> getAuditLogsByUrlDomain(@PathVariable String urlDomain) {
+        List<AuditLog> auditLogs = auditLogService.getAuditLogsByUrlDomain(urlDomain);
+        return ResponseEntity.ok(auditLogs);
+    }
+
+    /**
      * Get audit logs by entity name
      */
     @GetMapping("/entity/{entityName}")
@@ -129,6 +156,42 @@ public class AuditLogController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime start,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime end) {
         List<AuditLog> auditLogs = auditLogService.getAuditLogsByEntityNameAndDateRange(entityName, start, end);
+        return ResponseEntity.ok(auditLogs);
+    }
+
+    /**
+     * Get audit logs by user ID and date range
+     */
+    @GetMapping("/user-id/{userId}/date-range")
+    public ResponseEntity<List<AuditLog>> getAuditLogsByUserIdAndDateRange(
+            @PathVariable String userId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime start,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime end) {
+        List<AuditLog> auditLogs = auditLogService.getAuditLogsByUserIdAndDateRange(userId, start, end);
+        return ResponseEntity.ok(auditLogs);
+    }
+
+    /**
+     * Get audit logs by organization ID and date range
+     */
+    @GetMapping("/organization-id/{organizationId}/date-range")
+    public ResponseEntity<List<AuditLog>> getAuditLogsByOrganizationIdAndDateRange(
+            @PathVariable String organizationId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime start,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime end) {
+        List<AuditLog> auditLogs = auditLogService.getAuditLogsByOrganizationIdAndDateRange(organizationId, start, end);
+        return ResponseEntity.ok(auditLogs);
+    }
+
+    /**
+     * Get audit logs by URL domain and date range
+     */
+    @GetMapping("/url-domain/{urlDomain}/date-range")
+    public ResponseEntity<List<AuditLog>> getAuditLogsByUrlDomainAndDateRange(
+            @PathVariable String urlDomain,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime start,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime end) {
+        List<AuditLog> auditLogs = auditLogService.getAuditLogsByUrlDomainAndDateRange(urlDomain, start, end);
         return ResponseEntity.ok(auditLogs);
     }
 
